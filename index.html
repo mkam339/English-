@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>منصة الإنجليزي — مشاريع الطلاب • واجبات • تنبيهات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --bg:#f8fafc; --primary:#0ea5e9; --emerald:#10b981; --amber:#f59e0b; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:'Tajawal',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;background:var(--bg);color:var(--ink)}
+
+    header{position:sticky;top:0;z-index:50;background:#ffffffcc;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+    .bar{max-width:1150px;margin:auto;display:flex;align-items:center;gap:12px;padding:12px 16px}
+    .brand{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--primary);color:#fff;font-weight:800}
+
+    .tabs{max-width:1150px;margin:16px auto;padding:0 16px}
+    .tab-heads{display:flex;gap:8px;flex-wrap:wrap}
+    .tab-heads label{cursor:pointer;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;font-weight:600}
+    input[name=tabs]{display:none}
+    #tab-feed:checked ~ .tab-heads label[for=tab-feed],
+    #tab-homework:checked ~ .tab-heads label[for=tab-homework],
+    #tab-updates:checked ~ .tab-heads label[for=tab-updates]{background:#0f172a;color:#fff;border-color:#0f172a}
+
+    .tab-panels{margin-top:12px}
+    .panel{display:none;border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
+    #tab-feed:checked ~ .tab-panels #panel-feed,
+    #tab-homework:checked ~ .tab-panels #panel-homework,
+    #tab-updates:checked ~ .tab-panels #panel-updates{display:block}
+
+    .feed{display:flex;flex-direction:column-reverse;gap:16px;padding:16px} 
+    .post{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgba(2,6,23,.06)}
+    .post h2{margin:14px 16px 6px 16px;font:800 20px 'Tajawal',system-ui}
+    .meta{margin:-2px 16px 8px 16px;color:var(--muted);font-size:13px}
+    .post p{margin:0 16px 16px 16px;color:#334155;line-height:1.7}
+
+    /* لا نحدد الطول هنا لأننا سنستخدم width/height داخل كود <img> */
+    .post img{
+      /* اجعل الصورة تملأ عرض البطاقة بالكامل وتظهر كاملة بدون قص */
+      width:100%;
+      height:auto; /* يحافظ على التناسق مع العرض ويمنع القص */
+      display:block;
+      border-radius:8px;
+    }
+
+    .list{padding:16px}
+    .item{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+    .due{font-size:13px;color:var(--muted)}
+
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
+    .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+    .badge-amber{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand">EN</div>
+      <div>
+        <h1>منصة الإنجليزي — مشاريع الطلاب</h1>
+        <p style="color:var(--muted);font-size:14px">منشورات (نص + صورة بأبعاد مناسبة)، واجبات يومية، تحديثات واختبارات</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="tabs">
+    <input type="radio" id="tab-feed" name="tabs" checked>
+    <input type="radio" id="tab-homework" name="tabs">
+    <input type="radio" id="tab-updates" name="tabs">
+
+    <div class="tab-heads">
+      <label for="tab-feed">المشاركات</label>
+      <label for="tab-homework">الواجبات اليومية</label>
+      <label for="tab-updates">تحديثات واختبارات</label>
+    </div>
+
+    <div class="tab-panels">
+      <section id="panel-feed" class="panel">
+        <div class="feed" id="projects">
+          <!-- قالب إضافة مشروع جديد -->
+          <!--
+          <div class="post">
+            <h2>عنوان المشروع</h2>
+            <p class="meta">اسم الطالب — 08/09/2025</p>
+            <img src="your-image.jpg" alt="وصف الصورة" width="800" height="500">
+            <p>وصف قصير للمشروع.</p>
+          </div>
+          -->
+
+          <div class="post">
+            <h2>قصة قصيرة: The Lost Puppy</h2>
+            <p class="meta">طالبة: سارة علي — 07/09/2025</p>
+            <img src="https://images.unsplash.com/photo-1507149833265-60c372daea22?q=80&w=1200&auto=format&fit=crop" alt="قصة The Lost Puppy" width="800" height="500">
+            <p>Storyboard من 6 لقطات لتعليم السرد البسيط في المضارع.</p>
+          </div>
+
+          <div class="post">
+            <h2>بودكاست عن الهوايات</h2>
+            <p class="meta">طالب: محمد حمدي — 06/09/2025</p>
+            <img src="https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&w=1200&auto=format&fit=crop" alt="بودكاست الهوايات" width="800" height="500">
+            <p>تسجيل صوتي دقيقتين يتحدث فيه الطالب عن هواياته باستخدام Present Simple.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-homework" class="panel">
+        <div class="list">
+          <div class="item">
+            <div><strong>مراجعة كلمات الوحدة 4 (Quizlet)</strong></div>
+            <div class="due">تاريخ التسليم: 10/09/2025</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-updates" class="panel">
+        <div class="list">
+          <div class="item">
+            <div><span class="badge badge-amber">تنبيه</span> اختبار استماع الثلاثاء القادم</div>
+            <div class="due">نُشر: 07/09/2025</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  
+</body>
+</html>
