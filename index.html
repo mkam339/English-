@@ -181,14 +181,42 @@
           <p>هذه مجموعة صور مساعدة للطلاب قبل الامتحان.</p>
           <div class="media-grid">
             <img src="https://fv5-4.files.fm/thumb_show.php?i=avhdh5h4ux&view&v=1&PHPSESSID=8601ab731f1c525f298f14bcbbec8b3ee9070799" alt="صورة 1">
-            <img src="https://i.ibb.co/pv5Y5jQm/Screenshot-2025-09-10-135403.png" alt="صورة 1">
+            <img src="https://i.ibb.co/pv5Y5jQm/Screenshot-2025-09-10-135403.png" alt="صورة 2">
           </div>
         </div>
       </section>
     </div>
   </section>
 
-  <!-- 🔗 ربط ملف Firebase app.js -->
+  <!-- ====== إضافة أدوات الإدارة + ربط app.js ====== -->
+  <style>
+    #adminBar{display:none;position:sticky;top:60px;background:#0f172a;color:#fff;padding:8px 12px;z-index:1000;border-radius:12px;margin:12px}
+    #adminBar button{margin-inline-start:8px}
+    #loginModal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0006}
+    #loginModal form{background:#fff;padding:16px;border-radius:12px;min-width:280px}
+  </style>
+
+  <div id="adminBar">
+    <span id="adminEmail"></span>
+    <button id="logoutBtn">تسجيل خروج</button>
+    <button id="openPostForm">منشور جديد</button>
+    <button id="openHWForm">واجب جديد</button>
+    <button id="openExamForm">تعديل الامتحان</button>
+  </div>
+
+  <div id="loginModal">
+    <form id="loginForm">
+      <h3>تسجيل دخول المشرف</h3>
+      <input id="email" type="email" placeholder="البريد" required style="display:block;width:100%;margin:8px 0;padding:8px">
+      <input id="password" type="password" placeholder="كلمة المرور" required style="display:block;width:100%;margin:8px 0;padding:8px">
+      <button type="submit">دخول</button>
+      <button type="button" id="closeLogin">إغلاق</button>
+      <p style="font-size:12px;color:#64748b;margin-top:8px">* الزوار لا يحتاجون تسجيل دخول</p>
+    </form>
+  </div>
+
+  <div id="formsRoot"></div>
   <script type="module" src="app.js"></script>
+  <!-- ====== نهاية الإضافة ====== -->
 </body>
 </html>
