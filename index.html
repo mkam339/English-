@@ -81,8 +81,10 @@
       <!-- ===================== المشاركات ===================== -->
       <section id="panel-feed" class="panel">
         <div class="feed" id="projects">
-          <!-- ضع كود المنشور الجديد دائماً في أعلى هذه القائمة -->
+          <!-- سنضيف منشورات Firestore ديناميكيًا هنا دون حذف يدوياتك -->
+          <div id="dynamicPosts"></div>
 
+          <!-- (محتواك اليدوي كما هو) -->
           <div class="post">
             <h2>فيديو يوثق مشاركات الطلاب في مادة اللغة الانجليزية</h2>
             <p class="meta"> 10/09/2025</p>
@@ -149,6 +151,8 @@
       <!-- ===================== الواجبات ===================== -->
       <section id="panel-homework" class="panel">
         <div class="list">
+          <div id="homeworksDynamic"></div><!-- واجبات Firestore (مضاف) -->
+
           <div class="item">
             <div><span class="badge badge-amber">H,W</span>p.231</div>
             <div class="due">نُشر: 09/09/2025</div>
@@ -174,6 +178,9 @@
           </div>
         </div>
 
+        <!-- امتحان ديناميكي (إن وجد) دون حذف ما فوق -->
+        <div id="examDynamic" class="list"></div>
+
         <!-- منشور متعدد الوسائط أسفل معلومات الاختبار -->
         <div class="post" style="margin:16px">
           <h2>مراجعة بصرية قبل الامتحان</h2>
@@ -188,7 +195,7 @@
     </div>
   </section>
 
-  <!-- ====== إضافة أدوات الإدارة + ربط app.js ====== -->
+  <!-- ====== أدوات الإدارة + نافذة تسجيل الدخول + إصلاح زر الإغلاق ====== -->
   <style>
     #adminBar{display:none;position:sticky;top:60px;background:#0f172a;color:#fff;padding:8px 12px;z-index:1000;border-radius:12px;margin:12px}
     #adminBar button{margin-inline-start:8px}
@@ -210,13 +217,16 @@
       <input id="email" type="email" placeholder="البريد" required style="display:block;width:100%;margin:8px 0;padding:8px">
       <input id="password" type="password" placeholder="كلمة المرور" required style="display:block;width:100%;margin:8px 0;padding:8px">
       <button type="submit">دخول</button>
-      <button type="button" id="closeLogin">إغلاق</button>
+      <!-- زر إغلاق يعمل دائمًا -->
+      <button type="button" id="closeLogin"
+              onclick="document.getElementById('loginModal').style.display='none'">
+        إغلاق
+      </button>
       <p style="font-size:12px;color:#64748b;margin-top:8px">* الزوار لا يحتاجون تسجيل دخول</p>
     </form>
   </div>
 
   <div id="formsRoot"></div>
   <script type="module" src="app.js"></script>
-  <!-- ====== نهاية الإضافة ====== -->
 </body>
 </html>
