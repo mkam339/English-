@@ -54,63 +54,14 @@
     .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .badge-amber{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
 
-    /* ===== تحسين واجهة تسجيل الدخول (كارت زجاجي أنيق) ===== */
-    #adminBar{display:none;position:sticky;top:60px;background:#0f172a;color:#fff;padding:8px 12px;z-index:1000;border-radius:12px;margin:12px}
-    #adminBar button{margin-inline-start:8px}
-
-    #loginModal{
-      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-      background:rgba(2,6,23,.55); backdrop-filter: blur(10px); z-index:2000; padding:16px;
+    /* شريط الأدمن */
+    .admin-bar{
+      display:none; position:sticky; top:64px; z-index:40;
+      background:#0f172a; color:#fff; padding:10px 16px; border-bottom:1px solid #222;
     }
-    .login-card{
-      width:min(92vw,420px);
-      background:linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.85));
-      border:1px solid rgba(15,23,42,.08);
-      border-radius:18px;
-      box-shadow: 0 20px 60px rgba(2,6,23,.20);
-      padding:22px 20px;
-      position:relative;
-      overflow:hidden;
-    }
-    .login-brand{
-      display:flex;align-items:center;gap:10px;margin-bottom:14px
-    }
-    .login-logo{
-      width:44px;height:44px;border-radius:12px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800
-    }
-    .login-title{margin:0;font:800 20px 'Tajawal',system-ui;color:#0f172a}
-    .login-sub{margin:2px 0 0 0;color:#64748b;font-size:13px}
-
-    .field{margin:10px 0}
-    .label{display:block;margin:0 0 6px 0;font-weight:700;font-size:13px;color:#0f172a}
-    .control{
-      display:flex;align-items:center;gap:8px;
-      border:1px solid var(--line); background:#fff; border-radius:12px; padding:10px 12px;
-      transition: box-shadow .15s ease, border-color .15s ease;
-    }
-    .control:focus-within{ border-color:#94a3b8; box-shadow:0 0 0 4px rgba(14,165,233,.15) }
-    .control input{
-      width:100%; border:none; outline:none; background:transparent; font-family:inherit; font-size:15px; color:#0f172a;
-    }
-    .toggle-pass{cursor:pointer;font-size:12px;color:#0ea5e9;border:none;background:transparent}
-    .login-actions{display:flex;gap:10px;align-items:center;margin-top:12px}
-    .btn{
-      border:none; cursor:pointer; border-radius:12px; padding:10px 14px; font-weight:700;
-    }
-    .btn-primary{ background:#0f172a; color:#fff }
-    .btn-ghost{ background:#f1f5f9; color:#0f172a }
-    .btn:hover{ filter:brightness(.97) }
-    .helper{font-size:12px;color:#64748b;margin-top:8px}
-
-    .close-x{
-      position:absolute; inset-inline-end:10px; top:10px; width:36px; height:36px; border-radius:10px;
-      display:grid; place-items:center; cursor:pointer; border:1px solid var(--line); background:#fff;
-    }
-    .close-x:hover{ background:#f8fafc }
-
-    .error{
-      margin-top:8px; font-size:13px; color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; border-radius:10px; padding:8px 10px; display:none
-    }
+    .admin-bar .row{max-width:1150px;margin:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .admin-bar .row button{background:#f1f5f9;color:#0f172a;border:none;padding:8px 14px;border-radius:8px;cursor:pointer}
+    .admin-bar small{opacity:.85}
   </style>
 </head>
 <body>
@@ -123,6 +74,18 @@
       </div>
     </div>
   </header>
+
+  <!-- ===== شريط الأدمن (يظهر بعد تسجيل الدخول كأدمن) ===== -->
+  <div class="admin-bar" id="adminBar">
+    <div class="row">
+      <small>أدمن: <span id="adminEmail"></span></small>
+      <button id="newPostBtn">منشور جديد</button>
+      <button id="newHwBtn">واجب جديد</button>
+      <button id="editExamBtn">تعديل الامتحان</button>
+      <button id="logoutBtn">تسجيل خروج</button>
+    </div>
+  </div>
+  <!-- ===== /شريط الأدمن ===== -->
 
   <section class="tabs">
     <input type="radio" id="tab-feed" name="tabs" checked>
@@ -138,11 +101,11 @@
     <div class="tab-panels">
       <!-- ===================== المشاركات ===================== -->
       <section id="panel-feed" class="panel">
-        <div class="feed" id="projects">
-          <!-- منشورات Firestore (تُحقن هنا) -->
-          <div id="dynamicPosts"></div>
+        <!-- يعرض المشاركات القادمة من Firestore -->
+        <div class="feed" id="postsLive"></div>
 
-          <!-- محتوىك اليدوي كما هو -->
+        <div class="feed" id="projects">
+          <!-- منشوراتك الثابتة كما هي -->
           <div class="post">
             <h2>فيديو يوثق مشاركات الطلاب في مادة اللغة الانجليزية</h2>
             <p class="meta"> 10/09/2025</p>
@@ -209,11 +172,15 @@
       <!-- ===================== الواجبات ===================== -->
       <section id="panel-homework" class="panel">
         <div class="list">
-          <div id="homeworksDynamic"></div>
           <div class="item">
             <div><span class="badge badge-amber">H,W</span>p.231</div>
             <div class="due">نُشر: 09/09/2025</div>
           </div>
+
+          <!-- يعرض الواجبات من Firestore -->
+          <div id="homeworksLive"></div>
+
+          <!-- منشور متعدد الصور أسفل معلومات الواجب (موجود سابقًا) -->
           <div class="post" style="margin-top:16px;">
             <h2></h2>
             <p class="meta">إدارة المادة — 09/09/2025</p>
@@ -226,6 +193,9 @@
 
       <!-- ===================== تحديثات واختبارات ===================== -->
       <section id="panel-updates" class="panel">
+        <!-- يعرض منشور الامتحان من Firestore -->
+        <div id="examLive"></div>
+
         <div class="list" id="updatesList">
           <div class="item">
             <div><span class="badge badge-amber">امتحان</span> English Test on Thursday on Unit 1</div>
@@ -233,91 +203,21 @@
           </div>
         </div>
 
-        <div id="examDynamic" class="list"></div>
-
+        <!-- منشور متعدد الوسائط أسفل معلومات الاختبار (موجود سابقًا) -->
         <div class="post" style="margin:16px">
           <h2>مراجعة بصرية قبل الامتحان</h2>
           <p class="meta">إدارة المادة — 09/09/2025</p>
           <p>هذه مجموعة صور مساعدة للطلاب قبل الامتحان.</p>
           <div class="media-grid">
             <img src="https://fv5-4.files.fm/thumb_show.php?i=avhdh5h4ux&view&v=1&PHPSESSID=8601ab731f1c525f298f14bcbbec8b3ee9070799" alt="صورة 1">
-            <img src="https://i.ibb.co/pv5Y5jQm/Screenshot-2025-09-10-135403.png" alt="صورة 2">
+            <img src="https://i.ibb.co/pv5Y5jQm/Screenshot-2025-09-10-135403.png" alt="صورة 1">
           </div>
         </div>
       </section>
     </div>
   </section>
 
-  <!-- ====== شريط الإدارة + نافذة تسجيل الدخول المحسّنة ====== -->
-  <div id="adminBar">
-    <span id="adminEmail"></span>
-    <button id="logoutBtn">تسجيل خروج</button>
-    <button id="openPostForm">منشور جديد</button>
-    <button id="openHWForm">واجب جديد</button>
-    <button id="openExamForm">تعديل الامتحان</button>
-  </div>
-
-  <div id="loginModal">
-    <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-      <button class="close-x" type="button" id="closeLogin"
-              onclick="document.getElementById('loginModal').style.display='none'">✕</button>
-
-      <div class="login-brand">
-        <div class="login-logo">EN</div>
-        <div>
-          <h3 id="loginTitle" class="login-title">تسجيل دخول المشرف</h3>
-          <p class="login-sub">يستطيع الزوار الإغلاق للمشاهدة بدون تسجيل</p>
-        </div>
-      </div>
-
-      <form id="loginForm" novalidate>
-        <div class="field">
-          <label class="label" for="email">البريد الإلكتروني</label>
-          <div class="control">
-            <input id="email" type="email" placeholder="name@example.com" required>
-          </div>
-        </div>
-
-        <div class="field">
-          <label class="label" for="password">كلمة المرور</label>
-          <div class="control">
-            <input id="password" type="password" placeholder="••••••••" required>
-            <button class="toggle-pass" type="button" id="togglePass">عرض</button>
-          </div>
-        </div>
-
-        <div class="error" id="loginError">حدث خطأ أثناء تسجيل الدخول</div>
-
-        <div class="login-actions">
-          <button class="btn btn-primary" type="submit">دخول</button>
-          <button class="btn btn-ghost" type="button"
-                  onclick="document.getElementById('loginModal').style.display='none'">الدخول كزائر</button>
-        </div>
-        <p class="helper">* لن يحتاج الطلاب إلى حساب لعرض المحتوى.</p>
-      </form>
-    </div>
-  </div>
-
-  <!-- ربط سكربت التطبيق -->
-  <script type="module" src="app.js"></script>
-
-  <!-- وظائف صغيرة لواجهة الدخول (لا تغيّر app.js) -->
-  <script>
-    // عرض/إخفاء كلمة المرور
-    (function(){
-      const btn = document.getElementById('togglePass');
-      const input = document.getElementById('password');
-      if(btn && input){
-        btn.addEventListener('click', ()=>{
-          const isPwd = input.type === 'password';
-          input.type = isPwd ? 'text' : 'password';
-          btn.textContent = isPwd ? 'إخفاء' : 'عرض';
-        });
-      }
-    })();
-
-    // لو حدث خطأ login من app.js، يمكنك مناداة هذا من هناك:
-    // document.getElementById('loginError').style.display = 'block';
-  </script>
+  <!-- 🔗 ربط ملف Firebase app.js -->
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
