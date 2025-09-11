@@ -9,7 +9,7 @@ import {
   onSnapshot, serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-// ===== Config (منك) =====
+// ===== Config الخاص بك =====
 const firebaseConfig = {
   apiKey: "AIzaSyAWjjaE-VO_nzW3DHbdMGCwIjzq8EjexzY",
   authDomain: "english-726f0.firebaseapp.com",
@@ -23,13 +23,16 @@ const firebaseConfig = {
 // ===== Init =====
 const app = initializeApp(firebaseConfig);
 getAnalytics(app);
-const auth = getAuth(app);
-const db = getFirestore(app);
+console.log("✅ Firebase تم تهيئته بنجاح:", app);
 
-// ===== Helpers =====
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ===== DOM helpers =====
 const qs = s => document.querySelector(s);
 const ce = (tag, attrs={}) => Object.assign(document.createElement(tag), attrs);
 
+// عناصر الواجهة الموجودة في index.html
 const adminBar      = qs('#adminBar');
 const adminEmailEl  = qs('#adminEmail');
 const loginModal    = qs('#loginModal');
@@ -46,82 +49,90 @@ const btnLogout     = qs('#logoutBtn');
 
 let isAdmin = false;
 
-// ===== check admin by firestore config/admins.emails =====
+// ===== التحقق من الأدمن من Firestore (config/admins.emails) =====
 async function checkAdmin(email){
   try{
     const ref = doc(db, 'config', 'admins');
     const snap = await getDoc(ref);
     const emails = snap.exists() ? snap.data().emails || [] : [];
     return Array.isArray(emails) && emails.includes(email);
-  }catch(e){ console.error(e); return false; }
+  }catch(e){
+    console.error("checkAdmin error:", e);
+    return false;
+  }
 }
 
-// ===== auth state =====
+// ===== حالة تسجيل الدخول =====
 onAuthStateChanged(auth, async user=>{
-  if(user){
-    isAdmin = await checkAdmin(user.email);
-    adminBar.style.display = isAdmin ? 'block' : 'none';
-    adminEmailEl.textContent = isAdmin ? user.email : '';
-    // أخفي نافذة الدخول إذا كان أدمن
-    if(isAdmin) loginModal.style.display = 'none';
-  }else{
-    isAdmin = false;
-    adminBar.style.display = 'none';
-    adminEmailEl.textContent = '';
-    // أظهر نافذة الدخول للزوار (يمكنهم الضغط "زائر")
-    loginModal.style.display = 'flex';
+  try{
+    if(user){
+      isAdmin = await checkAdmin(user.email);
+      adminBar && (adminBar.style.display = isAdmin ? 'block' : 'none');
+      if (adminEmailEl) adminEmailEl.textContent = isAdmin ? user.email : '';
+      if (isAdmin && loginModal) loginModal.style.display = 'none';
+    }else{
+      isAdmin = false;
+      adminBar && (adminBar.style.display = 'none');
+      if (adminEmailEl) adminEmailEl.textContent = '';
+      // نظهر نافذة الدخول للزائر
+      if (loginModal) loginModal.style.display = 'flex';
+    }
+  }catch(err){
+    console.error("auth state error:", err);
   }
 });
 
-// ===== Login form =====
+// ===== تسجيل الدخول =====
 loginForm?.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const email = qs('#email')?.value.trim();
   const password = qs('#password')?.value;
   const errBox = qs('#loginError');
   try{
-    errBox.style.display = 'none';
+    errBox && (errBox.style.display = 'none');
     await signInWithEmailAndPassword(auth, email, password);
   }catch(err){
     console.error(err);
-    errBox.textContent = err.message;
-    errBox.style.display = 'block';
+    if (errBox){
+      errBox.textContent = err.message;
+      errBox.style.display = 'block';
+    } else {
+      alert("خطأ تسجيل الدخول: " + err.message);
+    }
   }
 });
 
-// ===== Logout =====
+// ===== تسجيل الخروج =====
 btnLogout?.addEventListener('click', async ()=>{
-  await signOut(auth);
-  location.reload();
+  try{
+    await signOut(auth);
+    location.reload();
+  }catch(err){
+    console.error(err);
+    alert("تعذر تسجيل الخروج: " + err.message);
+  }
 });
 
-// ========== Real-time renders ==========
-
-// Posts
+// ===== عرض حقيقي (Realtime) =====
 function renderPosts(snapshot){
+  if (!postsLive) return;
   postsLive.innerHTML = '';
   snapshot.forEach(docSnap=>{
     const d = docSnap.data();
     const wrap = ce('div', {className:'post'});
     const title = ce('h2', {textContent: d.title || 'منشور بدون عنوان'});
-    const meta = ce('p', {className:'meta', textContent: `${d.author||''} — ${d.date||''}`});
+    const meta  = ce('p', {className:'meta', textContent: `${d.author||''} — ${d.date||''}`});
     wrap.append(title, meta);
-
     if(d.text) wrap.append(ce('p', {textContent:d.text}));
 
-    // images (array of urls)
     if(Array.isArray(d.images) && d.images.length){
       const grid = ce('div', {className:'media-grid'});
       d.images.forEach(u=> grid.append(ce('img', {src:u, alt:'صورة'})));
       wrap.append(grid);
     }
-    // videos (array of urls)
     if(Array.isArray(d.videos) && d.videos.length){
       const grid = ce('div', {className:'media-grid'});
-      d.videos.forEach(u=> {
-        const v = ce('video', {src:u, controls:true});
-        grid.append(v);
-      });
+      d.videos.forEach(u=> grid.append(ce('video', {src:u, controls:true})));
       wrap.append(grid);
     }
 
@@ -130,7 +141,9 @@ function renderPosts(snapshot){
       const editBtn = ce('button', {textContent:'تعديل'});
       const delBtn  = ce('button', {textContent:'حذف'});
       editBtn.onclick = ()=> editPost(docSnap.id, d);
-      delBtn.onclick  = ()=> deleteDoc(doc(db,'posts',docSnap.id));
+      delBtn.onclick  = async ()=> {
+        if(confirm('حذف هذا المنشور؟')) await deleteDoc(doc(db,'posts',docSnap.id));
+      };
       actions.append(editBtn, delBtn);
       wrap.append(actions);
     }
@@ -139,8 +152,8 @@ function renderPosts(snapshot){
   });
 }
 
-// Homeworks
 function renderHomeworks(snapshot){
+  if (!hwsLive) return;
   hwsLive.innerHTML = '';
   snapshot.forEach(docSnap=>{
     const d = docSnap.data();
@@ -154,7 +167,9 @@ function renderHomeworks(snapshot){
       const editBtn = ce('button', {textContent:'تعديل'});
       const delBtn  = ce('button', {textContent:'حذف'});
       editBtn.onclick = ()=> editHomework(docSnap.id, d);
-      delBtn.onclick  = ()=> deleteDoc(doc(db,'homeworks',docSnap.id));
+      delBtn.onclick  = async ()=> {
+        if(confirm('حذف الواجب؟')) await deleteDoc(doc(db,'homeworks',docSnap.id));
+      };
       actions.append(editBtn, delBtn);
       item.append(actions);
     }
@@ -162,8 +177,8 @@ function renderHomeworks(snapshot){
   });
 }
 
-// Exam (single doc)
 function renderExam(docSnap){
+  if (!examLive) return;
   examLive.innerHTML = '';
   if(!docSnap.exists()){
     examLive.innerHTML = `<div class="item"><div><span class="badge badge-amber">امتحان</span> لا يوجد منشور امتحان بعد</div></div>`;
@@ -176,16 +191,14 @@ function renderExam(docSnap){
   examLive.append(item);
 }
 
-// Realtime subscriptions
+// اشتراكات realtime
 const postsQuery = query(collection(db,'posts'), orderBy('createdAt','desc'));
 onSnapshot(postsQuery, renderPosts);
 const hwsQuery   = query(collection(db,'homeworks'), orderBy('createdAt','desc'));
 onSnapshot(hwsQuery, renderHomeworks);
 onSnapshot(doc(db,'exam','main'), renderExam);
 
-// ========== Admin actions ==========
-
-// New post (up to 5 images + videos via URLs)
+// ===== إجراءات الأدمن (بدون أي عناصر إضافية) =====
 btnNewPost?.addEventListener('click', async ()=>{
   if(!isAdmin) return alert('صلاحيات الأدمن فقط');
   const title = prompt('عنوان المنشور:');
@@ -195,13 +208,17 @@ btnNewPost?.addEventListener('click', async ()=>{
   const text   = prompt('وصف/نص المنشور (اختياري):') || '';
   const imgs   = prompt('روابط الصور (افصل بفاصلة)، اختياري:') || '';
   const vids   = prompt('روابط الفيديو (افصل بفاصلة)، اختياري:') || '';
-  await addDoc(collection(db,'posts'), {
-    title, author, date, text,
-    images: imgs.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
-    videos: vids.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
-    createdAt: serverTimestamp()
-  });
-  alert('تم إضافة المنشور ✅');
+  try{
+    await addDoc(collection(db,'posts'), {
+      title, author, date, text,
+      images: imgs.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
+      videos: vids.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
+      createdAt: serverTimestamp()
+    });
+    alert('تم إضافة المنشور ✅');
+  }catch(err){
+    console.error(err); alert('فشل الإضافة: ' + err.message);
+  }
 });
 
 async function editPost(id, d){
@@ -213,24 +230,29 @@ async function editPost(id, d){
   const text   = prompt('تعديل الوصف:', d.text||'') ?? '';
   const imgs   = prompt('تعديل روابط الصور (مفصولة بفواصل):', (d.images||[]).join(', ')) ?? '';
   const vids   = prompt('تعديل روابط الفيديو:', (d.videos||[]).join(', ')) ?? '';
-  await updateDoc(doc(db,'posts',id), {
-    title, author, date, text,
-    images: imgs.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
-    videos: vids.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
-  });
-  alert('تم التعديل ✅');
+  try{
+    await updateDoc(doc(db,'posts',id), {
+      title, author, date, text,
+      images: imgs.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
+      videos: vids.split(',').map(s=>s.trim()).filter(Boolean).slice(0,5),
+    });
+    alert('تم التعديل ✅');
+  }catch(err){
+    console.error(err); alert('فشل التعديل: ' + err.message);
+  }
 }
 
-// New homework
 btnNewHw?.addEventListener('click', async ()=>{
   if(!isAdmin) return alert('صلاحيات الأدمن فقط');
   const title = prompt('نص الواجب (مثال p.231):');
   if(title===null) return;
   const due   = prompt('تاريخ النشر/التسليم:') || '';
-  await addDoc(collection(db,'homeworks'), {
-    title, due, createdAt: serverTimestamp()
-  });
-  alert('تم إضافة الواجب ✅');
+  try{
+    await addDoc(collection(db,'homeworks'), { title, due, createdAt: serverTimestamp() });
+    alert('تم إضافة الواجب ✅');
+  }catch(err){
+    console.error(err); alert('فشل الإضافة: ' + err.message);
+  }
 });
 
 async function editHomework(id, d){
@@ -238,16 +260,23 @@ async function editHomework(id, d){
   const title = prompt('تعديل نص الواجب:', d.title||'');
   if(title===null) return;
   const due   = prompt('تعديل التاريخ:', d.due||'') ?? '';
-  await updateDoc(doc(db,'homeworks',id), { title, due });
-  alert('تم التعديل ✅');
+  try{
+    await updateDoc(doc(db,'homeworks',id), { title, due });
+    alert('تم التعديل ✅');
+  }catch(err){
+    console.error(err); alert('فشل التعديل: ' + err.message);
+  }
 }
 
-// Edit exam (single doc exam/main)
 btnEditExam?.addEventListener('click', async ()=>{
   if(!isAdmin) return alert('صلاحيات الأدمن فقط');
   const title = prompt('نص منشور الامتحان (مثال: اختبار مفردات يوم الأحد 9:00 صباحًا — القاعة A):');
   if(title===null) return;
   const publishedAt = prompt('تاريخ النشر:') || '';
-  await setDoc(doc(db,'exam','main'), { title, publishedAt, updatedAt: serverTimestamp() });
-  alert('تم حفظ/تعديل الامتحان ✅');
+  try{
+    await setDoc(doc(db,'exam','main'), { title, publishedAt, updatedAt: serverTimestamp() });
+    alert('تم حفظ/تعديل الامتحان ✅');
+  }catch(err){
+    console.error(err); alert('فشل حفظ الامتحان: ' + err.message);
+  }
 });
