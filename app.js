@@ -1,11 +1,8 @@
-// app.js
-// ربط موقعك مع Firebase
-
-// استدعاء مكتبات Firebase
+// استيراد مكتبات Firebase الأساسية
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
 
-// إعدادات Firebase الخاصة بمشروعك
+// ⚡ هنا تضع إعدادات مشروعك من Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAWjjaE-VO_nzW3DHbdMGCwIjzq8EjexzY",
   authDomain: "english-726f0.firebaseapp.com",
@@ -16,16 +13,9 @@ const firebaseConfig = {
   measurementId: "G-WCJZHHSE7X"
 };
 
-// تهيئة Firebase
+// ✅ تهيئة Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const analytics = getAnalytics(app);
 
-// اختبار جلب البيانات من Firestore
-async function testFirestore() {
-  const querySnapshot = await getDocs(collection(db, "config"));
-  querySnapshot.forEach((doc) => {
-    console.log(`${doc.id} =>`, doc.data());
-  });
-}
-
-testFirestore();
+// للتأكد أن الاتصال صحيح
+console.log("✅ Firebase تم تهيئته بنجاح:", app);
