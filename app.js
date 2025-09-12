@@ -1,15 +1,10 @@
-// app.js — إدارة + عرض Realtime (CRUD + رفع ملفات + إصلاحات الطلبات 1..5)
+// app.js — إدارة + عرض Realtime (CRUD) مع دعم تعدد الاختبارات ومنع حجب الشريط
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
-} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, onSnapshot, query, orderBy,
   serverTimestamp, setDoc, addDoc, updateDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-import {
-  getStorage, ref as sRef, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
 // === Firebase config ===
 const firebaseConfig = {
@@ -25,9 +20,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const storage = getStorage(app);
 
-// === عناصر الصفحة ===
+// عناصر الصفحة
 const adminBar      = document.getElementById('adminBar');
 const adminEmailEl  = document.getElementById('adminEmail');
 const logoutBtn     = document.getElementById('logoutBtn');
@@ -40,7 +34,7 @@ const hwDynEl        = document.getElementById('homeworksDynamic');
 const examDynEl      = document.getElementById('examDynamic');
 const updatesListEl  = document.getElementById('updatesList');
 
-// ✅ ينشئ formsRoot تلقائيًا إذا مفقود
+// ✅ إنشاء formsRoot تلقائياً إذا مفقود
 const formsRoot = (() => {
   let el = document.getElementById('formsRoot');
   if (!el) { el = document.createElement('div'); el.id = 'formsRoot'; document.body.appendChild(el); }
@@ -51,17 +45,18 @@ const openPostFormBtn = document.getElementById('openPostForm');
 const openHWFormBtn   = document.getElementById('openHWForm');
 const openExamFormBtn = document.getElementById('openExamForm');
 
-// === تحريك الامتحان الديناميكي للأعلى (طلبك #2)
+// إبقاء قائمة الاختبارات فوق الإعلان اليدوي
 if (examDynEl && updatesListEl && examDynEl.previousElementSibling !== updatesListEl) {
-  updatesListEl.parentNode.insertBefore(examDynEl, updatesListEl); // examDynamic فوق القديم اليدوي
+  updatesListEl.parentNode.insertBefore(examDynEl, updatesListEl);
 }
 
-// === ثوابت/حالة عامة ===
+// حالة عامة
 let isAdmin = false;
-let postsCache = [];    // لإعادة الرسم عند تغيّر حالة الأدمن (#1)
+let postsCache = [];
 let hwCache = [];
-let examCache = null;
+let examsCache = []; // ✅ بدلاً من examCache المفرد
 
+// فحص الأدمن
 async function checkAdmin(email){
   if (!email) return false;
   const d = await getDoc(doc(db,'config','admins'));
@@ -72,44 +67,40 @@ async function checkAdmin(email){
 onAuthStateChanged(auth, async (user)=>{
   isAdmin = user ? await checkAdmin(user.email) : false;
 
-  // (#3) تثبيت شريط الأدمن بمكان ثابت من خلال CSS inline
+  // شريط الأدمن + منع الحجب
   if (adminBar) {
-    adminBar.style.display = isAdmin ? 'flex' : 'none';
-    adminBar.style.position = 'fixed';
-    adminBar.style.top = '10px';         // ممكن تبدّلها لـ 'auto' و adminBar.style.bottom='10px' لو تحب أسفل الصفحة
-    adminBar.style.right = '10px';
-    adminBar.style.left = 'auto';
-    adminBar.style.zIndex = '3000';
+    adminBar.style.display   = isAdmin ? 'flex' : 'none';
+    adminBar.style.position  = 'fixed';
+    adminBar.style.top       = '10px';
+    adminBar.style.right     = '10px';
+    adminBar.style.zIndex    = '3000';
     adminBar.style.borderRadius = '12px';
   }
+  document.body.classList.toggle('admin-on', isAdmin); // ✅ يضيف padding-top عند ظهور الشريط
 
   if (adminEmailEl) adminEmailEl.textContent = isAdmin && user ? user.email : '';
   if (user && isAdmin && loginModal) loginModal.style.display = 'none';
 
-  // (#1) إعادة رسم القوائم بعد علمنا أنك أدمن لإظهار أزرار تعديل/حذف
+  // إعادة رسم لإظهار أزرار الأدمن
   renderPosts(postsCache);
   renderHomeworks(hwCache);
-  renderExam(examCache);
+  renderExams(examsCache);
 });
 
-// === دخول/خروج ===
+// دخول/خروج
 loginForm?.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  try{
-    await signInWithEmailAndPassword(auth, email, password);
-  }catch(err){
+  try{ await signInWithEmailAndPassword(auth, email, password); }
+  catch(err){
     alert('فشل الدخول: '+err.message);
     const errBox = document.getElementById('loginError'); if (errBox) errBox.style.display = 'block';
   }
 });
-logoutBtn?.addEventListener('click', async ()=>{
-  await signOut(auth);
-  alert('تم تسجيل الخروج');
-});
+logoutBtn?.addEventListener('click', async ()=>{ await signOut(auth); alert('تم تسجيل الخروج'); });
 
-// === عرض المشاركات (مع أزرار تعديل/حذف للأدمن) ===
+// ======== المشاركات ========
 function renderPosts(list){
   postsCache = list || [];
   if(!dynamicPostsEl) return;
@@ -142,7 +133,7 @@ onSnapshot(query(collection(db,'posts'), orderBy('created_at','desc')),(snap)=>{
   renderPosts(posts);
 });
 
-// === عرض الواجبات (مع أزرار تعديل/حذف) ===
+// ======== الواجبات ========
 function renderHomeworks(rows){
   hwCache = rows || [];
   if(!hwDynEl) return;
@@ -161,36 +152,35 @@ onSnapshot(query(collection(db,'homeworks'), orderBy('published_at','desc')),(sn
   renderHomeworks(snap.docs.map(d=>({id:d.id,...d.data()})));
 });
 
-// === الامتحان الحالي (أزرار تعديل/حذف) ===
-function renderExam(ex){
-  examCache = ex || null;
+// ======== الاختبارات (مجموعة متعددة) ========
+function renderExams(rows){
+  examsCache = rows || [];
   if(!examDynEl) return;
-  if(!examCache){ examDynEl.innerHTML=''; return; }
-  examDynEl.innerHTML = `
-    <div class="item">
-      <div><span class="badge badge-amber">امتحان</span> ${esc(examCache.title||'')}</div>
-      <div class="due">نُشر: ${fmt(examCache.published_at?.toDate?.() || new Date())}</div>
+  examDynEl.innerHTML = examsCache.map(ex=>`
+    <div class="item" data-id="${ex.id}">
+      <div><span class="badge badge-amber">امتحان</span> ${esc(ex.title||'')}</div>
+      <div class="due">نُشر: ${fmt(ex.published_at?.toDate?.() || new Date())}</div>
       ${isAdmin?`
         <div style="margin-top:8px;display:flex;gap:8px">
-          <button id="btn-edit-exam">تعديل</button>
-          <button id="btn-del-exam">حذف</button>
+          <button class="btn-edit-exam" data-id="${ex.id}">تعديل</button>
+          <button class="btn-del-exam"  data-id="${ex.id}">حذف</button>
         </div>`:''}
-    </div>`;
+    </div>`).join('');
 }
-onSnapshot(doc(db,'exam','current'),(d)=>{
-  renderExam(d.exists()? d.data(): null);
+onSnapshot(query(collection(db,'exam'), orderBy('published_at','desc')),(snap)=>{
+  renderExams(snap.docs.map(d=>({id:d.id,...d.data()})));
 });
 
-// === أزرار فتح النماذج (إضافة) ===
+// ======== فتح النماذج (إضافة) ========
 openPostFormBtn?.addEventListener('click', ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountPostForm(); });
 openHWFormBtn?.addEventListener('click',   ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountHWForm(); });
-openExamFormBtn?.addEventListener('click', ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountExamForm(examCache || null); });
+openExamFormBtn?.addEventListener('click', ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountExamForm(); });
 
-// === تفويض أحداث للتعديل/الحذف ===
+// ======== تفويض أحداث التعديل/الحذف ========
 dynamicPostsEl?.addEventListener('click', async (e)=>{
   const editBtn = e.target.closest('.btn-edit-post');
   const delBtn  = e.target.closest('.btn-del-post');
-  if (editBtn){ 
+  if (editBtn){
     if(!isAdmin) return alert('للمدراء فقط');
     const id = editBtn.dataset.id;
     const d = await getDoc(doc(db,'posts',id));
@@ -199,7 +189,7 @@ dynamicPostsEl?.addEventListener('click', async (e)=>{
   if (delBtn){
     if(!isAdmin) return alert('للمدراء فقط');
     const id = delBtn.dataset.id;
-    if (confirm('هل تريد حذف هذا المنشور؟')) {
+    if (confirm('حذف هذا المنشور؟')) {
       try { await deleteDoc(doc(db,'posts',id)); alert('تم الحذف'); }
       catch(err){ alert('تعذّر الحذف: '+err.message); }
     }
@@ -226,21 +216,25 @@ hwDynEl?.addEventListener('click', async (e)=>{
 });
 
 examDynEl?.addEventListener('click', async (e)=>{
-  if (e.target.id === 'btn-edit-exam'){
+  const editBtn = e.target.closest('.btn-edit-exam');
+  const delBtn  = e.target.closest('.btn-del-exam');
+  if (editBtn){
     if(!isAdmin) return alert('للمدراء فقط');
-    mountExamForm(examCache || null);
+    const id = editBtn.dataset.id;
+    const d = await getDoc(doc(db,'exam',id));
+    if (d.exists()) mountExamForm({id, ...d.data()});
   }
-  if (e.target.id === 'btn-del-exam'){
+  if (delBtn){
     if(!isAdmin) return alert('للمدراء فقط');
-    if (confirm('حذف إعلان الامتحان الحالي؟')) {
-      try { await deleteDoc(doc(db,'exam','current')); alert('تم الحذف'); }
+    const id = delBtn.dataset.id;
+    if (confirm('حذف هذا الاختبار؟')) {
+      try { await deleteDoc(doc(db,'exam',id)); alert('تم الحذف'); }
       catch(err){ alert('تعذّر الحذف: '+err.message); }
     }
   }
 });
 
-// === نماذج الإضافة/التعديل ===
-// posts: إضافة/تعديل + رفع ملفات من الجهاز (طلبك #5)
+// ======== النماذج ========
 function mountPostForm(post=null){
   const isEdit = !!(post && post.id);
   const title0 = esc(post?.title||'');
@@ -254,13 +248,8 @@ function mountPostForm(post=null){
       <h3>${isEdit?'تعديل منشور':'منشور جديد'}</h3>
       <input id="pTitle" value="${title0}" placeholder="العنوان" required style="display:block;width:100%;margin:6px 0;padding:8px">
       <textarea id="pBody" placeholder="وصف (اختياري)" style="display:block;width:100%;margin:6px 0;padding:8px">${body0}</textarea>
-
       <p>روابط وسائط (اختياري — كل سطر: <code>image|https://..</code> أو <code>video|https://..</code> أو <code>link|https://..</code>)</p>
       <textarea id="pMedia" style="display:block;width:100%;min-height:90px;margin:6px 0;padding:8px">${media0}</textarea>
-
-      <p>أو حمِّل ملفات من جهازك (حتى 5 ملفات):</p>
-      <input id="pFiles" type="file" multiple style="display:block;margin:6px 0">
-
       <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
       <button type="button" id="closeForms">إغلاق</button>
     </form>
@@ -272,25 +261,10 @@ function mountPostForm(post=null){
       const title=document.getElementById('pTitle').value.trim();
       const body =document.getElementById('pBody').value.trim();
       const mediaLines=document.getElementById('pMedia').value.split('\n').map(s=>s.trim()).filter(Boolean);
-      let media=mediaLines.slice(0,5).map((line,idx)=>{
+      const media=mediaLines.slice(0,5).map((line,idx)=>{
         const [type,url]=line.includes('|')?line.split('|'):[ 'link', line ];
         return { type, url, sort:idx };
       });
-
-      // رفع ملفات محلية (إن وجدت) — يضيف روابطها إلى media
-      const files = Array.from(document.getElementById('pFiles').files||[]).slice(0, 5-media.length);
-      let idx = media.length;
-      for (const file of files) {
-        const path = `uploads/${auth.currentUser?.uid || 'admin'}/${Date.now()}_${idx}_${file.name}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, file);
-        const url = await getDownloadURL(r);
-        // تحديد النوع من mime
-        const t = file.type.startsWith('image/') ? 'image'
-                : file.type.startsWith('video/') ? 'video'
-                : 'link';
-        media.push({ type: t, url, sort: idx++ });
-      }
 
       if (isEdit){
         await updateDoc(doc(db,'posts',post.id), { title, body, media });
@@ -305,7 +279,6 @@ function mountPostForm(post=null){
   };
 }
 
-// homeworks: إضافة/تعديل
 function mountHWForm(hw=null){
   const isEdit = !!(hw && hw.id);
   const title0 = esc(hw?.title||'');
@@ -323,28 +296,24 @@ function mountHWForm(hw=null){
     e.preventDefault();
     try{
       const title=document.getElementById('hTitle').value.trim();
-      if (isEdit){
-        await updateDoc(doc(db,'homeworks',hw.id), { title });
-      }else{
-        await addDoc(collection(db,'homeworks'),{ title, published_at:serverTimestamp() });
-      }
+      if (isEdit){ await updateDoc(doc(db,'homeworks',hw.id), { title }); }
+      else { await addDoc(collection(db,'homeworks'),{ title, published_at:serverTimestamp() }); }
       formsRoot.innerHTML='';
       alert(isEdit?'تم حفظ التعديلات':'تم حفظ الواجب');
-    }catch(err){
-      alert('تعذّر الحفظ: '+err.message);
-    }
+    }catch(err){ alert('تعذّر الحفظ: '+err.message); }
   };
 }
 
-// exam/current: إضافة/تعديل + حذف
+/* ✅ الاختبارات: إضافة/تعديل/حذف ضمن مجموعة exam */
 function mountExamForm(ex=null){
+  const isEdit = !!(ex && ex.id);
   const title0 = esc(ex?.title||'');
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
     <form id="exForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:92%">
-      <h3>${ex?'تعديل إعلان الامتحان':'إضافة إعلان الامتحان'}</h3>
-      <input id="eTitle" value="${title0}" placeholder="عنوان الامتحان" required style="display:block;width:100%;margin:6px 0;padding:8px">
-      <button type="submit">حفظ</button>
+      <h3>${isEdit?'تعديل اختبار':'اختبار جديد'}</h3>
+      <input id="eTitle" value="${title0}" placeholder="عنوان/وصف الاختبار" required style="display:block;width:100%;margin:6px 0;padding:8px">
+      <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
       <button type="button" id="closeForms">إغلاق</button>
     </form>
   </div>`;
@@ -353,7 +322,11 @@ function mountExamForm(ex=null){
     e.preventDefault();
     try{
       const title=document.getElementById('eTitle').value.trim();
-      await setDoc(doc(db,'exam','current'),{ title, published_at:serverTimestamp() },{ merge:true });
+      if (isEdit){
+        await updateDoc(doc(db,'exam',ex.id), { title });
+      }else{
+        await addDoc(collection(db,'exam'),{ title, published_at:serverTimestamp() });
+      }
       formsRoot.innerHTML='';
       alert('تم الحفظ');
     }catch(err){
@@ -362,12 +335,12 @@ function mountExamForm(ex=null){
   };
 }
 
-// === أدوات مساعدة ===
+// أدوات مساعدة
 function esc(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmt(d){ try{return new Intl.DateTimeFormat('ar-SA').format(d);}catch(e){return '';} }
 
-// === إغلاق نافذة الدخول ===
-function hideLogin() { const el = document.getElementById('loginModal'); if (el) el.style.display = 'none'; }
+// إغلاق نافذة الدخول
+function hideLogin(){ const el = document.getElementById('loginModal'); if (el) el.style.display='none'; }
 closeLogin?.addEventListener('click', hideLogin);
-document.getElementById('loginModal')?.addEventListener('click', (e) => { if (e.target && e.target.id === 'loginModal') hideLogin(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideLogin(); });
+document.getElementById('loginModal')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'loginModal') hideLogin(); });
+document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') hideLogin(); });
