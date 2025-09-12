@@ -1,4 +1,4 @@
-// app.js — إدارة + عرض Realtime (CRUD) مع دعم تعدد الاختبارات ومنع حجب الشريط
+// app.js — إدارة + عرض Realtime (CRUD) مع دعم تعدد الاختبارات + عرض الصور/الفيديو مضمّن
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
@@ -54,7 +54,7 @@ if (examDynEl && updatesListEl && examDynEl.previousElementSibling !== updatesLi
 let isAdmin = false;
 let postsCache = [];
 let hwCache = [];
-let examsCache = []; // ✅ بدلاً من examCache المفرد
+let examsCache = [];
 
 // فحص الأدمن
 async function checkAdmin(email){
@@ -76,7 +76,7 @@ onAuthStateChanged(auth, async (user)=>{
     adminBar.style.zIndex    = '3000';
     adminBar.style.borderRadius = '12px';
   }
-  document.body.classList.toggle('admin-on', isAdmin); // ✅ يضيف padding-top عند ظهور الشريط
+  document.body.classList.toggle('admin-on', isAdmin);
 
   if (adminEmailEl) adminEmailEl.textContent = isAdmin && user ? user.email : '';
   if (user && isAdmin && loginModal) loginModal.style.display = 'none';
@@ -100,6 +100,30 @@ loginForm?.addEventListener('submit', async (e)=>{
 });
 logoutBtn?.addEventListener('click', async ()=>{ await signOut(auth); alert('تم تسجيل الخروج'); });
 
+// ======== أدوات مساعدة للعرض ========
+function esc(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmt(d){ try{return new Intl.DateTimeFormat('ar-SA').format(d);}catch(e){return '';} }
+function isYouTube(u){
+  try{
+    const url = new URL(u);
+    return /(^|\.)youtube\.com$/.test(url.hostname) || url.hostname === 'youtu.be';
+  }catch{ return false; }
+}
+function ytEmbed(u){
+  try{
+    const url = new URL(u);
+    // تحويل watch?v= او shorts/ او youtu.be/ إلى /embed/ID
+    let id = '';
+    if (url.hostname === 'youtu.be') id = url.pathname.slice(1);
+    else if (url.pathname.startsWith('/watch')) id = url.searchParams.get('v') || '';
+    else if (url.pathname.startsWith('/shorts/')) id = url.pathname.split('/')[2] || '';
+    else if (url.pathname.startsWith('/live/')) id = url.pathname.split('/')[2] || '';
+    if (!id) return null;
+    const params = new URLSearchParams({ modestbranding:'1', rel:'0', controls:'1' });
+    return `https://www.youtube.com/embed/${id}?${params.toString()}`;
+  }catch{ return null; }
+}
+
 // ======== المشاركات ========
 function renderPosts(list){
   postsCache = list || [];
@@ -108,9 +132,20 @@ function renderPosts(list){
     const mediaHtml = Array.isArray(p.media)&&p.media.length ? `
       <div class="media-grid">
         ${p.media.sort((a,b)=>(a.sort??0)-(b.sort??0)).map(m=>{
-          if(m.type==='image') return `<img src="${m.url}" alt="">`;
-          if(m.type==='video') return `<a href="${m.url}" target="_blank">🎬 اضغط هنا لمشاهدة الفيديو</a>`;
-          return `<a href="${m.url}" target="_blank">🔗 رابط</a>`;
+          const url = m.url || '';
+          if(m.type==='image'){
+            return `<img src="${url}" loading="lazy" alt="">`;
+          }
+          if(m.type==='video'){
+            if (isYouTube(url)) {
+              const e = ytEmbed(url);
+              if (e) return `<iframe src="${e}" title="YouTube video" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px"></iframe>`;
+            }
+            // فيديو مباشر (mp4/…)
+            return `<video controls src="${url}" style="width:100%;display:block;border-radius:8px"></video>`;
+          }
+          // رابط فقط (حتى لو كان فيديو)
+          return `<a href="${url}" target="_blank">🔗 فتح الرابط</a>`;
         }).join('')}
       </div>` : '';
     const adminBtns = isAdmin ? `
@@ -304,7 +339,7 @@ function mountHWForm(hw=null){
   };
 }
 
-/* ✅ الاختبارات: إضافة/تعديل/حذف ضمن مجموعة exam */
+/* الاختبارات: إضافة/تعديل/حذف ضمن مجموعة exam */
 function mountExamForm(ex=null){
   const isEdit = !!(ex && ex.id);
   const title0 = esc(ex?.title||'');
@@ -334,13 +369,3 @@ function mountExamForm(ex=null){
     }
   };
 }
-
-// أدوات مساعدة
-function esc(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function fmt(d){ try{return new Intl.DateTimeFormat('ar-SA').format(d);}catch(e){return '';} }
-
-// إغلاق نافذة الدخول
-function hideLogin(){ const el = document.getElementById('loginModal'); if (el) el.style.display='none'; }
-closeLogin?.addEventListener('click', hideLogin);
-document.getElementById('loginModal')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'loginModal') hideLogin(); });
-document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') hideLogin(); });
