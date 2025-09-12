@@ -35,7 +35,17 @@ const hwListEl      = document.querySelector('#panel-homework .list');
 const hwDynEl       = document.getElementById('homeworksDynamic');
 const updatesListEl = document.getElementById('updatesList');
 const examDynEl     = document.getElementById('examDynamic');
-const formsRoot     = document.getElementById('formsRoot');
+
+// ✅ إصلاح: إنشاء حاضنة النماذج formsRoot تلقائياً إذا لم تكن موجودة
+const formsRoot = (() => {
+  let el = document.getElementById('formsRoot');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'formsRoot';
+    document.body.appendChild(el);
+  }
+  return el;
+})();
 
 const openPostFormBtn = document.getElementById('openPostForm');
 const openHWFormBtn   = document.getElementById('openHWForm');
@@ -52,10 +62,9 @@ async function checkAdmin(email){
 
 onAuthStateChanged(auth, async (user)=>{
   isAdmin = user ? await checkAdmin(user.email) : false;
-  adminBar.style.display = isAdmin ? 'block' : 'none';
-  adminEmailEl.textContent = isAdmin ? user.email : '';
-  // لا نخفي النافذة بالقوة لو الزائر يريد إغلاقها يدويًا
-  if (user && isAdmin) loginModal.style.display = 'none';
+  if (adminBar) adminBar.style.display = isAdmin ? 'block' : 'none';
+  if (adminEmailEl) adminEmailEl.textContent = isAdmin ? user.email : '';
+  if (user && isAdmin && loginModal) loginModal.style.display = 'none';
 });
 
 // تسجيل الدخول/الخروج
@@ -63,8 +72,13 @@ loginForm?.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  try{ await signInWithEmailAndPassword(auth, email, password); }
-  catch(err){ alert('فشل الدخول: '+err.message); }
+  try{
+    await signInWithEmailAndPassword(auth, email, password);
+  }catch(err){
+    alert('فشل الدخول: '+err.message);
+    const errBox = document.getElementById('loginError');
+    if (errBox) errBox.style.display = 'block';
+  }
 });
 logoutBtn?.addEventListener('click', async ()=>{
   await signOut(auth);
@@ -87,8 +101,7 @@ function renderPosts(list){
             if(m.type==='video') return `<a href="${m.url}" target="_blank">🎬 اضغط هنا لمشاهدة الفيديو</a>`;
             return `<a href="${m.url}" target="_blank">🔗 رابط</a>`;
           }).join('')}
-        </div>`:''
-      }
+        </div>`:''}
     </div>
   `).join('');
 }
@@ -144,15 +157,20 @@ function mountPostForm(){
   document.getElementById('closeForms').onclick=()=>formsRoot.innerHTML='';
   document.getElementById('postForm').onsubmit=async(e)=>{
     e.preventDefault();
-    const title=document.getElementById('pTitle').value.trim();
-    const body =document.getElementById('pBody').value.trim();
-    const mediaLines=document.getElementById('pMedia').value.split('\n').map(s=>s.trim()).filter(Boolean);
-    const media=mediaLines.slice(0,5).map((line,idx)=>{
-      const [type,url]=line.includes('|')?line.split('|'):[ 'link', line ];
-      return { type, url, sort:idx };
-    });
-    await addDoc(collection(db,'posts'),{ title, body, media, created_at:serverTimestamp(), is_published:true });
-    formsRoot.innerHTML='';
+    try{
+      const title=document.getElementById('pTitle').value.trim();
+      const body =document.getElementById('pBody').value.trim();
+      const mediaLines=document.getElementById('pMedia').value.split('\n').map(s=>s.trim()).filter(Boolean);
+      const media=mediaLines.slice(0,5).map((line,idx)=>{
+        const [type,url]=line.includes('|')?line.split('|'):[ 'link', line ];
+        return { type, url, sort:idx };
+      });
+      await addDoc(collection(db,'posts'),{ title, body, media, created_at:serverTimestamp(), is_published:true });
+      formsRoot.innerHTML='';
+      alert('تم حفظ المنشور');
+    }catch(err){
+      alert('تعذّر حفظ المنشور: '+err.message);
+    }
   };
 }
 
@@ -170,9 +188,14 @@ function mountHWForm(){
   document.getElementById('closeForms').onclick=()=>formsRoot.innerHTML='';
   document.getElementById('hwForm').onsubmit=async(e)=>{
     e.preventDefault();
-    const title=document.getElementById('hTitle').value.trim();
-    await addDoc(collection(db,'homeworks'),{ title, published_at:serverTimestamp() });
-    formsRoot.innerHTML='';
+    try{
+      const title=document.getElementById('hTitle').value.trim();
+      await addDoc(collection(db,'homeworks'),{ title, published_at:serverTimestamp() });
+      formsRoot.innerHTML='';
+      alert('تم حفظ الواجب');
+    }catch(err){
+      alert('تعذّر حفظ الواجب: '+err.message);
+    }
   };
 }
 
@@ -190,9 +213,14 @@ function mountExamForm(){
   document.getElementById('closeForms').onclick=()=>formsRoot.innerHTML='';
   document.getElementById('exForm').onsubmit=async(e)=>{
     e.preventDefault();
-    const title=document.getElementById('eTitle').value.trim();
-    await setDoc(doc(db,'exam','current'),{ title, published_at:serverTimestamp() },{ merge:true });
-    formsRoot.innerHTML='';
+    try{
+      const title=document.getElementById('eTitle').value.trim();
+      await setDoc(doc(db,'exam','current'),{ title, published_at:serverTimestamp() },{ merge:true });
+      formsRoot.innerHTML='';
+      alert('تم تحديث إعلان الامتحان');
+    }catch(err){
+      alert('تعذّر تحديث الامتحان: '+err.message);
+    }
   };
 }
 
