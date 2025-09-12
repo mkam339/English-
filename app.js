@@ -1,4 +1,4 @@
-// app.js — إدارة + عرض Realtime (CRUD كامل) بدون حذف محتوى HTML اليدوي
+// app.js — إدارة + عرض Realtime (CRUD + رفع ملفات + إصلاحات الطلبات 1..5)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
@@ -7,6 +7,9 @@ import {
   getFirestore, collection, doc, getDoc, onSnapshot, query, orderBy,
   serverTimestamp, setDoc, addDoc, updateDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import {
+  getStorage, ref as sRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
 // === Firebase config ===
 const firebaseConfig = {
@@ -22,6 +25,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const storage = getStorage(app);
 
 // === عناصر الصفحة ===
 const adminBar      = document.getElementById('adminBar');
@@ -34,6 +38,7 @@ const closeLogin    = document.getElementById('closeLogin');
 const dynamicPostsEl = document.getElementById('dynamicPosts');
 const hwDynEl        = document.getElementById('homeworksDynamic');
 const examDynEl      = document.getElementById('examDynamic');
+const updatesListEl  = document.getElementById('updatesList');
 
 // ✅ ينشئ formsRoot تلقائيًا إذا مفقود
 const formsRoot = (() => {
@@ -46,8 +51,17 @@ const openPostFormBtn = document.getElementById('openPostForm');
 const openHWFormBtn   = document.getElementById('openHWForm');
 const openExamFormBtn = document.getElementById('openExamForm');
 
-// === صلاحيات الأدمن ===
+// === تحريك الامتحان الديناميكي للأعلى (طلبك #2)
+if (examDynEl && updatesListEl && examDynEl.previousElementSibling !== updatesListEl) {
+  updatesListEl.parentNode.insertBefore(examDynEl, updatesListEl); // examDynamic فوق القديم اليدوي
+}
+
+// === ثوابت/حالة عامة ===
 let isAdmin = false;
+let postsCache = [];    // لإعادة الرسم عند تغيّر حالة الأدمن (#1)
+let hwCache = [];
+let examCache = null;
+
 async function checkAdmin(email){
   if (!email) return false;
   const d = await getDoc(doc(db,'config','admins'));
@@ -57,9 +71,25 @@ async function checkAdmin(email){
 
 onAuthStateChanged(auth, async (user)=>{
   isAdmin = user ? await checkAdmin(user.email) : false;
-  if (adminBar) adminBar.style.display = isAdmin ? 'block' : 'none';
-  if (adminEmailEl) adminEmailEl.textContent = isAdmin ? user.email : '';
+
+  // (#3) تثبيت شريط الأدمن بمكان ثابت من خلال CSS inline
+  if (adminBar) {
+    adminBar.style.display = isAdmin ? 'flex' : 'none';
+    adminBar.style.position = 'fixed';
+    adminBar.style.top = '10px';         // ممكن تبدّلها لـ 'auto' و adminBar.style.bottom='10px' لو تحب أسفل الصفحة
+    adminBar.style.right = '10px';
+    adminBar.style.left = 'auto';
+    adminBar.style.zIndex = '3000';
+    adminBar.style.borderRadius = '12px';
+  }
+
+  if (adminEmailEl) adminEmailEl.textContent = isAdmin && user ? user.email : '';
   if (user && isAdmin && loginModal) loginModal.style.display = 'none';
+
+  // (#1) إعادة رسم القوائم بعد علمنا أنك أدمن لإظهار أزرار تعديل/حذف
+  renderPosts(postsCache);
+  renderHomeworks(hwCache);
+  renderExam(examCache);
 });
 
 // === دخول/خروج ===
@@ -81,8 +111,9 @@ logoutBtn?.addEventListener('click', async ()=>{
 
 // === عرض المشاركات (مع أزرار تعديل/حذف للأدمن) ===
 function renderPosts(list){
+  postsCache = list || [];
   if(!dynamicPostsEl) return;
-  dynamicPostsEl.innerHTML = list.map(p=>{
+  dynamicPostsEl.innerHTML = postsCache.map(p=>{
     const mediaHtml = Array.isArray(p.media)&&p.media.length ? `
       <div class="media-grid">
         ${p.media.sort((a,b)=>(a.sort??0)-(b.sort??0)).map(m=>{
@@ -113,8 +144,9 @@ onSnapshot(query(collection(db,'posts'), orderBy('created_at','desc')),(snap)=>{
 
 // === عرض الواجبات (مع أزرار تعديل/حذف) ===
 function renderHomeworks(rows){
+  hwCache = rows || [];
   if(!hwDynEl) return;
-  hwDynEl.innerHTML = rows.map(h=>`
+  hwDynEl.innerHTML = hwCache.map(h=>`
     <div class="item" data-id="${h.id}">
       <div><strong>${h.title}</strong></div>
       <div class="due">نُشر: ${fmt(h.published_at?.toDate?.() || new Date())}</div>
@@ -130,26 +162,29 @@ onSnapshot(query(collection(db,'homeworks'), orderBy('published_at','desc')),(sn
 });
 
 // === الامتحان الحالي (أزرار تعديل/حذف) ===
-onSnapshot(doc(db,'exam','current'),(d)=>{
+function renderExam(ex){
+  examCache = ex || null;
   if(!examDynEl) return;
-  if(!d.exists()){ examDynEl.innerHTML=''; return; }
-  const ex = d.data();
+  if(!examCache){ examDynEl.innerHTML=''; return; }
   examDynEl.innerHTML = `
     <div class="item">
-      <div><span class="badge badge-amber">امتحان</span> ${esc(ex.title||'')}</div>
-      <div class="due">نُشر: ${fmt(ex.published_at?.toDate?.() || new Date())}</div>
+      <div><span class="badge badge-amber">امتحان</span> ${esc(examCache.title||'')}</div>
+      <div class="due">نُشر: ${fmt(examCache.published_at?.toDate?.() || new Date())}</div>
       ${isAdmin?`
         <div style="margin-top:8px;display:flex;gap:8px">
           <button id="btn-edit-exam">تعديل</button>
           <button id="btn-del-exam">حذف</button>
         </div>`:''}
     </div>`;
+}
+onSnapshot(doc(db,'exam','current'),(d)=>{
+  renderExam(d.exists()? d.data(): null);
 });
 
 // === أزرار فتح النماذج (إضافة) ===
 openPostFormBtn?.addEventListener('click', ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountPostForm(); });
 openHWFormBtn?.addEventListener('click',   ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountHWForm(); });
-openExamFormBtn?.addEventListener('click', ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountExamForm(); });
+openExamFormBtn?.addEventListener('click', ()=>{ if(!isAdmin) return alert('للمدراء فقط'); mountExamForm(examCache || null); });
 
 // === تفويض أحداث للتعديل/الحذف ===
 dynamicPostsEl?.addEventListener('click', async (e)=>{
@@ -193,8 +228,7 @@ hwDynEl?.addEventListener('click', async (e)=>{
 examDynEl?.addEventListener('click', async (e)=>{
   if (e.target.id === 'btn-edit-exam'){
     if(!isAdmin) return alert('للمدراء فقط');
-    const d = await getDoc(doc(db,'exam','current'));
-    mountExamForm(d.exists()? d.data(): null);
+    mountExamForm(examCache || null);
   }
   if (e.target.id === 'btn-del-exam'){
     if(!isAdmin) return alert('للمدراء فقط');
@@ -206,7 +240,7 @@ examDynEl?.addEventListener('click', async (e)=>{
 });
 
 // === نماذج الإضافة/التعديل ===
-// posts: إذا مرّرت كائن post → تعديل، غير ذلك → إضافة
+// posts: إضافة/تعديل + رفع ملفات من الجهاز (طلبك #5)
 function mountPostForm(post=null){
   const isEdit = !!(post && post.id);
   const title0 = esc(post?.title||'');
@@ -216,12 +250,17 @@ function mountPostForm(post=null){
                   .map(m=>`${m.type||'link'}|${m.url||''}`).join('\n') : '';
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
-    <form id="postForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:90%">
+    <form id="postForm" style="background:#fff;padding:16px;border-radius:12px;max-width:560px;width:92%">
       <h3>${isEdit?'تعديل منشور':'منشور جديد'}</h3>
       <input id="pTitle" value="${title0}" placeholder="العنوان" required style="display:block;width:100%;margin:6px 0;padding:8px">
       <textarea id="pBody" placeholder="وصف (اختياري)" style="display:block;width:100%;margin:6px 0;padding:8px">${body0}</textarea>
-      <p>وسائط (حتى 5) — كل سطر: <code>image|https://..</code> أو <code>video|https://..</code> أو <code>link|https://..</code></p>
-      <textarea id="pMedia" style="display:block;width:100%;min-height:100px;margin:6px 0;padding:8px">${media0}</textarea>
+
+      <p>روابط وسائط (اختياري — كل سطر: <code>image|https://..</code> أو <code>video|https://..</code> أو <code>link|https://..</code>)</p>
+      <textarea id="pMedia" style="display:block;width:100%;min-height:90px;margin:6px 0;padding:8px">${media0}</textarea>
+
+      <p>أو حمِّل ملفات من جهازك (حتى 5 ملفات):</p>
+      <input id="pFiles" type="file" multiple style="display:block;margin:6px 0">
+
       <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
       <button type="button" id="closeForms">إغلاق</button>
     </form>
@@ -233,10 +272,26 @@ function mountPostForm(post=null){
       const title=document.getElementById('pTitle').value.trim();
       const body =document.getElementById('pBody').value.trim();
       const mediaLines=document.getElementById('pMedia').value.split('\n').map(s=>s.trim()).filter(Boolean);
-      const media=mediaLines.slice(0,5).map((line,idx)=>{
+      let media=mediaLines.slice(0,5).map((line,idx)=>{
         const [type,url]=line.includes('|')?line.split('|'):[ 'link', line ];
         return { type, url, sort:idx };
       });
+
+      // رفع ملفات محلية (إن وجدت) — يضيف روابطها إلى media
+      const files = Array.from(document.getElementById('pFiles').files||[]).slice(0, 5-media.length);
+      let idx = media.length;
+      for (const file of files) {
+        const path = `uploads/${auth.currentUser?.uid || 'admin'}/${Date.now()}_${idx}_${file.name}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, file);
+        const url = await getDownloadURL(r);
+        // تحديد النوع من mime
+        const t = file.type.startsWith('image/') ? 'image'
+                : file.type.startsWith('video/') ? 'video'
+                : 'link';
+        media.push({ type: t, url, sort: idx++ });
+      }
+
       if (isEdit){
         await updateDoc(doc(db,'posts',post.id), { title, body, media });
       }else{
@@ -256,7 +311,7 @@ function mountHWForm(hw=null){
   const title0 = esc(hw?.title||'');
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
-    <form id="hwForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:90%">
+    <form id="hwForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:92%">
       <h3>${isEdit?'تعديل واجب':'واجب جديد'}</h3>
       <input id="hTitle" value="${title0}" placeholder="مثال: &lt;span class='badge badge-amber'&gt;H,W&lt;/span&gt;p.231" required style="display:block;width:100%;margin:6px 0;padding:8px">
       <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
@@ -286,7 +341,7 @@ function mountExamForm(ex=null){
   const title0 = esc(ex?.title||'');
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
-    <form id="exForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:90%">
+    <form id="exForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:92%">
       <h3>${ex?'تعديل إعلان الامتحان':'إضافة إعلان الامتحان'}</h3>
       <input id="eTitle" value="${title0}" placeholder="عنوان الامتحان" required style="display:block;width:100%;margin:6px 0;padding:8px">
       <button type="submit">حفظ</button>
