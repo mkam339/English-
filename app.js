@@ -1,4 +1,4 @@
-// app.js — إدارة + عرض Realtime (CRUD) مع دعم تعدد الاختبارات + عرض الصور/الفيديو مضمّن
+// app.js — إدارة + عرض Realtime (CRUD) مع دعم تعدد الاختبارات + عرض الصور/الفيديو مضمّن (يوتيوب Shorts مُصلَّح)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
@@ -103,25 +103,49 @@ logoutBtn?.addEventListener('click', async ()=>{ await signOut(auth); alert('ت�
 // ======== أدوات مساعدة للعرض ========
 function esc(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmt(d){ try{return new Intl.DateTimeFormat('ar-SA').format(d);}catch(e){return '';} }
+
+// 🔧 تحقّق من يوتيوب (يدعم youtube.com / www / m. / youtu.be)
 function isYouTube(u){
   try{
     const url = new URL(u);
-    return /(^|\.)youtube\.com$/.test(url.hostname) || url.hostname === 'youtu.be';
+    return /(^|\.)youtube\.com$/.test(url.hostname) || /(^|\.)m\.youtube\.com$/.test(url.hostname) || url.hostname === 'youtu.be';
   }catch{ return false; }
 }
+
+// 🔧 توليد رابط embed صحيح لكل الأشكال (watch/shorts/youtu.be/live) مع إزالة ?si=... & باقي المعاملات
 function ytEmbed(u){
   try{
     const url = new URL(u);
-    // تحويل watch?v= او shorts/ او youtu.be/ إلى /embed/ID
     let id = '';
-    if (url.hostname === 'youtu.be') id = url.pathname.slice(1);
-    else if (url.pathname.startsWith('/watch')) id = url.searchParams.get('v') || '';
-    else if (url.pathname.startsWith('/shorts/')) id = url.pathname.split('/')[2] || '';
-    else if (url.pathname.startsWith('/live/')) id = url.pathname.split('/')[2] || '';
+
+    if (url.hostname === 'youtu.be') {
+      id = url.pathname.slice(1);
+    } else {
+      const path = url.pathname.replace(/\/+$/,''); // شيل السلاشات الأخيرة
+      if (path.startsWith('/watch')) {
+        id = url.searchParams.get('v') || '';
+      } else if (path.startsWith('/shorts/')) {
+        id = path.split('/')[2] || '';
+      } else if (path.startsWith('/live/')) {
+        id = path.split('/')[2] || '';
+      }
+    }
+
+    // إزالة أي معاملات زائدة ملتصقة بالـID
+    id = (id || '').split('?')[0].split('&')[0];
+
     if (!id) return null;
-    const params = new URLSearchParams({ modestbranding:'1', rel:'0', controls:'1' });
+
+    const params = new URLSearchParams({
+      modestbranding:'1',
+      rel:'0',
+      controls:'1'
+    });
+
     return `https://www.youtube.com/embed/${id}?${params.toString()}`;
-  }catch{ return null; }
+  }catch{
+    return null;
+  }
 }
 
 // ======== المشاركات ========
@@ -139,7 +163,9 @@ function renderPosts(list){
           if(m.type==='video'){
             if (isYouTube(url)) {
               const e = ytEmbed(url);
-              if (e) return `<iframe src="${e}" title="YouTube video" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px"></iframe>`;
+              if (e) {
+                return `<iframe src="${e}" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px"></iframe>`;
+              }
             }
             // فيديو مباشر (mp4/…)
             return `<video controls src="${url}" style="width:100%;display:block;border-radius:8px"></video>`;
