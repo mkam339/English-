@@ -54,10 +54,22 @@
     .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .badge-amber{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
 
-    /* ===== تحسين واجهة تسجيل الدخول (كارت زجاجي أنيق) ===== */
-    #adminBar{display:none;position:sticky;top:60px;background:#0f172a;color:#fff;padding:8px 12px;z-index:1000;border-radius:12px;margin:12px}
+    /* ===== شريط الإدارة (ثابت كما طلبت) ===== */
+    #adminBar{
+      display:none;           /* يُظهره app.js لو المستخدم أدمن */
+      position:fixed;         /* كان sticky */
+      top:10px;
+      right:10px;
+      background:#0f172a;
+      color:#fff;
+      padding:8px 12px;
+      z-index:3000;
+      border-radius:12px;
+      gap:8px;
+    }
     #adminBar button{margin-inline-start:8px}
 
+    /* ===== نافذة تسجيل الدخول (كما هي) ===== */
     #loginModal{
       position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
       background:rgba(2,6,23,.55); backdrop-filter: blur(10px); z-index:2000; padding:16px;
@@ -72,45 +84,25 @@
       position:relative;
       overflow:hidden;
     }
-    .login-brand{
-      display:flex;align-items:center;gap:10px;margin-bottom:14px
-    }
-    .login-logo{
-      width:44px;height:44px;border-radius:12px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800
-    }
+    .login-brand{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+    .login-logo{width:44px;height:44px;border-radius:12px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800}
     .login-title{margin:0;font:800 20px 'Tajawal',system-ui;color:#0f172a}
     .login-sub{margin:2px 0 0 0;color:#64748b;font-size:13px}
-
     .field{margin:10px 0}
     .label{display:block;margin:0 0 6px 0;font-weight:700;font-size:13px;color:#0f172a}
-    .control{
-      display:flex;align-items:center;gap:8px;
-      border:1px solid var(--line); background:#fff; border-radius:12px; padding:10px 12px;
-      transition: box-shadow .15s ease, border-color .15s ease;
-    }
+    .control{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;transition: box-shadow .15s ease, border-color .15s ease;}
     .control:focus-within{ border-color:#94a3b8; box-shadow:0 0 0 4px rgba(14,165,233,.15) }
-    .control input{
-      width:100%; border:none; outline:none; background:transparent; font-family:inherit; font-size:15px; color:#0f172a;
-    }
+    .control input{width:100%; border:none; outline:none; background:transparent; font-family:inherit; font-size:15px; color:#0f172a;}
     .toggle-pass{cursor:pointer;font-size:12px;color:#0ea5e9;border:none;background:transparent}
     .login-actions{display:flex;gap:10px;align-items:center;margin-top:12px}
-    .btn{
-      border:none; cursor:pointer; border-radius:12px; padding:10px 14px; font-weight:700;
-    }
+    .btn{border:none; cursor:pointer; border-radius:12px; padding:10px 14px; font-weight:700;}
     .btn-primary{ background:#0f172a; color:#fff }
     .btn-ghost{ background:#f1f5f9; color:#0f172a }
     .btn:hover{ filter:brightness(.97) }
     .helper{font-size:12px;color:#64748b;margin-top:8px}
-
-    .close-x{
-      position:absolute; inset-inline-end:10px; top:10px; width:36px; height:36px; border-radius:10px;
-      display:grid; place-items:center; cursor:pointer; border:1px solid var(--line); background:#fff;
-    }
+    .close-x{position:absolute; inset-inline-end:10px; top:10px; width:36px; height:36px; border-radius:10px; display:grid; place-items:center; cursor:pointer; border:1px solid var(--line); background:#fff;}
     .close-x:hover{ background:#f8fafc }
-
-    .error{
-      margin-top:8px; font-size:13px; color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; border-radius:10px; padding:8px 10px; display:none
-    }
+    .error{margin-top:8px; font-size:13px; color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; border-radius:10px; padding:8px 10px; display:none}
   </style>
 </head>
 <body>
@@ -142,7 +134,7 @@
           <!-- منشورات Firestore (تُحقن هنا) -->
           <div id="dynamicPosts"></div>
 
-          <!-- محتوىك اليدوي كما هو -->
+          <!-- محتوى يدوي كما هو -->
           <div class="post">
             <h2>فيديو يوثق مشاركات الطلاب في مادة اللغة الانجليزية</h2>
             <p class="meta"> 10/09/2025</p>
@@ -248,15 +240,16 @@
     </div>
   </section>
 
-  <!-- ====== شريط الإدارة + نافذة تسجيل الدخول المحسّنة ====== -->
+  <!-- ====== شريط الإدارة (العناوين كما طلبت) ====== -->
   <div id="adminBar">
     <span id="adminEmail"></span>
     <button id="logoutBtn">تسجيل خروج</button>
-    <button id="openPostForm">منشور جديد</button>
-    <button id="openHWForm">واجب جديد</button>
-    <button id="openExamForm">تعديل الامتحان</button>
+    <button id="openPostForm">المنشورات</button>
+    <button id="openHWForm">الواجبات</button>
+    <button id="openExamForm">الاختبارات</button>
   </div>
 
+  <!-- نافذة تسجيل الدخول -->
   <div id="loginModal">
     <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
       <button class="close-x" type="button" id="closeLogin"
@@ -301,9 +294,8 @@
   <!-- ربط سكربت التطبيق -->
   <script type="module" src="app.js"></script>
 
-  <!-- وظائف صغيرة لواجهة الدخول (لا تغيّر app.js) -->
+  <!-- وظائف صغيرة لواجهة الدخول (كما هي) -->
   <script>
-    // عرض/إخفاء كلمة المرور
     (function(){
       const btn = document.getElementById('togglePass');
       const input = document.getElementById('password');
@@ -315,9 +307,10 @@
         });
       }
     })();
-
-    // لو حدث خطأ login من app.js، يمكنك مناداة هذا من هناك:
     // document.getElementById('loginError').style.display = 'block';
   </script>
+
+  <!-- حاضنة النماذج (أضفناها لضمان عمل النوافذ الإدارية) -->
+  <div id="formsRoot"></div>
 </body>
 </html>
