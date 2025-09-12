@@ -1,4 +1,4 @@
-// app.js — إدارة + عرض Realtime (CRUD) مع دعم تعدد الاختبارات + عرض الصور/الفيديو مضمّن (يوتيوب Shorts مُصلَّح)
+// app.js — CRUD + دعم أنواع الوسائط من داخل النموذج + أكثر من ملف + تخطيط تلقائي + تحسينات واجهة الأدمن
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
@@ -34,7 +34,7 @@ const hwDynEl        = document.getElementById('homeworksDynamic');
 const examDynEl      = document.getElementById('examDynamic');
 const updatesListEl  = document.getElementById('updatesList');
 
-// ✅ إنشاء formsRoot تلقائياً إذا مفقود
+// formsRoot
 const formsRoot = (() => {
   let el = document.getElementById('formsRoot');
   if (!el) { el = document.createElement('div'); el.id = 'formsRoot'; document.body.appendChild(el); }
@@ -74,7 +74,7 @@ onAuthStateChanged(auth, async (user)=>{
     adminBar.style.top       = '10px';
     adminBar.style.right     = '10px';
     adminBar.style.zIndex    = '3000';
-    adminBar.style.borderRadius = '12px';
+    adminBar.style.borderRadius = '14px';
   }
   document.body.classList.toggle('admin-on', isAdmin);
 
@@ -103,49 +103,29 @@ logoutBtn?.addEventListener('click', async ()=>{ await signOut(auth); alert('ت�
 // ======== أدوات مساعدة للعرض ========
 function esc(s=''){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmt(d){ try{return new Intl.DateTimeFormat('ar-SA').format(d);}catch(e){return '';} }
-
-// 🔧 تحقّق من يوتيوب (يدعم youtube.com / www / m. / youtu.be)
 function isYouTube(u){
   try{
     const url = new URL(u);
     return /(^|\.)youtube\.com$/.test(url.hostname) || /(^|\.)m\.youtube\.com$/.test(url.hostname) || url.hostname === 'youtu.be';
   }catch{ return false; }
 }
-
-// 🔧 توليد رابط embed صحيح لكل الأشكال (watch/shorts/youtu.be/live) مع إزالة ?si=... & باقي المعاملات
 function ytEmbed(u){
   try{
     const url = new URL(u);
     let id = '';
-
     if (url.hostname === 'youtu.be') {
       id = url.pathname.slice(1);
     } else {
-      const path = url.pathname.replace(/\/+$/,''); // شيل السلاشات الأخيرة
-      if (path.startsWith('/watch')) {
-        id = url.searchParams.get('v') || '';
-      } else if (path.startsWith('/shorts/')) {
-        id = path.split('/')[2] || '';
-      } else if (path.startsWith('/live/')) {
-        id = path.split('/')[2] || '';
-      }
+      const path = url.pathname.replace(/\/+$/,'');
+      if (path.startsWith('/watch'))      id = url.searchParams.get('v') || '';
+      else if (path.startsWith('/shorts/')) id = path.split('/')[2] || '';
+      else if (path.startsWith('/live/'))   id = path.split('/')[2] || '';
     }
-
-    // إزالة أي معاملات زائدة ملتصقة بالـID
     id = (id || '').split('?')[0].split('&')[0];
-
     if (!id) return null;
-
-    const params = new URLSearchParams({
-      modestbranding:'1',
-      rel:'0',
-      controls:'1'
-    });
-
+    const params = new URLSearchParams({ modestbranding:'1', rel:'0', controls:'1' });
     return `https://www.youtube.com/embed/${id}?${params.toString()}`;
-  }catch{
-    return null;
-  }
+  }catch{ return null; }
 }
 
 // ======== المشاركات ========
@@ -153,25 +133,23 @@ function renderPosts(list){
   postsCache = list || [];
   if(!dynamicPostsEl) return;
   dynamicPostsEl.innerHTML = postsCache.map(p=>{
-    const mediaHtml = Array.isArray(p.media)&&p.media.length ? `
-      <div class="media-grid">
-        ${p.media.sort((a,b)=>(a.sort??0)-(b.sort??0)).map(m=>{
+    const media = Array.isArray(p.media) ? p.media.sort((a,b)=>(a.sort??0)-(b.sort??0)) : [];
+    const gridClass = `media-grid n${Math.min(media.length,3) || 1}`;
+    const mediaHtml = media.length ? `
+      <div class="${gridClass}">
+        ${media.map(m=>{
           const url = m.url || '';
           if(m.type==='image'){
-            return `<img src="${url}" loading="lazy" alt="">`;
+            return `<div class="media image"><img src="${url}" loading="lazy" alt=""></div>`;
           }
           if(m.type==='video'){
             if (isYouTube(url)) {
               const e = ytEmbed(url);
-              if (e) {
-                return `<iframe src="${e}" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px"></iframe>`;
-              }
+              if (e) return `<div class="media video"><iframe src="${e}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
             }
-            // فيديو مباشر (mp4/…)
-            return `<video controls src="${url}" style="width:100%;display:block;border-radius:8px"></video>`;
+            return `<div class="media video"><video controls src="${url}"></video></div>`;
           }
-          // رابط فقط (حتى لو كان فيديو)
-          return `<a href="${url}" target="_blank">🔗 فتح الرابط</a>`;
+          return `<div class="media link" style="background:#fff;padding:12px"><a href="${url}" target="_blank">🔗 فتح الرابط</a></div>`;
         }).join('')}
       </div>` : '';
     const adminBtns = isAdmin ? `
@@ -296,36 +274,85 @@ examDynEl?.addEventListener('click', async (e)=>{
 });
 
 // ======== النماذج ========
+
+// منشور: إضافة/تعديل — واجهة اختيار النوع + أكثر من ملف (حتى 12 عنصر افتراضياً)
 function mountPostForm(post=null){
   const isEdit = !!(post && post.id);
   const title0 = esc(post?.title||'');
   const body0  = esc(post?.body||'');
-  const media0 = Array.isArray(post?.media) ? post.media
-                  .sort((a,b)=>(a.sort??0)-(b.sort??0))
-                  .map(m=>`${m.type||'link'}|${m.url||''}`).join('\n') : '';
+  const media0 = Array.isArray(post?.media)
+    ? post.media.sort((a,b)=>(a.sort??0)-(b.sort??0))
+    : [];
+
+  const maxItems = 12;
+  const rowTpl = (type='image', url='') => `
+    <div class="mrow" style="display:flex;gap:8px;margin:6px 0;align-items:center">
+      <select class="mtype" style="padding:8px;border-radius:10px;border:1px solid #e5e7eb">
+        <option value="image" ${type==='image'?'selected':''}>صورة</option>
+        <option value="video" ${type==='video'?'selected':''}>فيديو</option>
+        <option value="link"  ${type==='link'?'selected':''}>رابط</option>
+      </select>
+      <input class="murl" value="${esc(url)}" placeholder="https://..." style="flex:1;padding:8px;border-radius:10px;border:1px solid #e5e7eb">
+      <button type="button" class="mremove" title="حذف" style="border:none;background:#fee2e2;color:#991b1b;padding:8px 10px;border-radius:10px;cursor:pointer">✕</button>
+    </div>`;
+
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
-    <form id="postForm" style="background:#fff;padding:16px;border-radius:12px;max-width:560px;width:92%">
-      <h3>${isEdit?'تعديل منشور':'منشور جديد'}</h3>
-      <input id="pTitle" value="${title0}" placeholder="العنوان" required style="display:block;width:100%;margin:6px 0;padding:8px">
-      <textarea id="pBody" placeholder="وصف (اختياري)" style="display:block;width:100%;margin:6px 0;padding:8px">${body0}</textarea>
-      <p>روابط وسائط (اختياري — كل سطر: <code>image|https://..</code> أو <code>video|https://..</code> أو <code>link|https://..</code>)</p>
-      <textarea id="pMedia" style="display:block;width:100%;min-height:90px;margin:6px 0;padding:8px">${media0}</textarea>
-      <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
-      <button type="button" id="closeForms">إغلاق</button>
+    <form id="postForm" style="background:#fff;padding:16px;border-radius:16px;max-width:640px;width:92%;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+      <h3 style="margin:0 0 8px 0">${isEdit?'تعديل منشور':'منشور جديد'}</h3>
+      <input id="pTitle" value="${title0}" placeholder="العنوان" required style="display:block;width:100%;margin:6px 0;padding:10px;border:1px solid #e5e7eb;border-radius:12px">
+      <textarea id="pBody" placeholder="وصف (اختياري)" style="display:block;width:100%;margin:6px 0;padding:10px;border:1px solid #e5e7eb;border-radius:12px;min-height:80px">${body0}</textarea>
+
+      <div style="margin:10px 0 6px;font-weight:700">الوسائط</div>
+      <div id="mediaRows"></div>
+      <div style="display:flex;gap:8px;margin:8px 0">
+        <button type="button" id="addMedia" style="background:#0f172a;color:#fff;border:none;border-radius:12px;padding:8px 12px;cursor:pointer">+ إضافة وسيط</button>
+        <span style="font-size:12px;color:#64748b">الحد الأقصى ${maxItems} عناصر</span>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button type="submit" style="background:#0f172a;color:#fff;border:none;border-radius:12px;padding:10px 14px;cursor:pointer">${isEdit?'حفظ التعديلات':'حفظ'}</button>
+        <button type="button" id="closeForms" style="background:#f1f5f9;color:#0f172a;border:none;border-radius:12px;padding:10px 14px;cursor:pointer">إغلاق</button>
+      </div>
     </form>
   </div>`;
+
+  const rowsEl = document.getElementById('mediaRows');
+  const addBtn = document.getElementById('addMedia');
+
+  const addRow = (type='image', url='')=>{
+    if (rowsEl.children.length >= maxItems) return alert(`وصلت للحد (${maxItems})`);
+    rowsEl.insertAdjacentHTML('beforeend', rowTpl(type, url));
+  };
+
+  // ملء الصفوف من البيانات القديمة
+  if (media0.length){
+    media0.forEach(m=> addRow(m.type||'link', m.url||''));
+  }else{
+    addRow(); // صف واحد افتراضي
+  }
+
+  // أحداث الإضافة/الحذف
+  addBtn.onclick = ()=> addRow();
+  rowsEl.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.mremove');
+    if (btn){ btn.parentElement.remove(); }
+  });
+
   document.getElementById('closeForms').onclick=()=>formsRoot.innerHTML='';
   document.getElementById('postForm').onsubmit=async(e)=>{
     e.preventDefault();
     try{
       const title=document.getElementById('pTitle').value.trim();
       const body =document.getElementById('pBody').value.trim();
-      const mediaLines=document.getElementById('pMedia').value.split('\n').map(s=>s.trim()).filter(Boolean);
-      const media=mediaLines.slice(0,5).map((line,idx)=>{
-        const [type,url]=line.includes('|')?line.split('|'):[ 'link', line ];
-        return { type, url, sort:idx };
-      });
+
+      // قراءة الصفوف بالترتيب
+      const rows = [...rowsEl.querySelectorAll('.mrow')];
+      const media = rows.map((row,idx)=>{
+        const type = row.querySelector('.mtype').value;
+        const url  = row.querySelector('.murl').value.trim();
+        return { type, url, sort: idx };
+      }).filter(m=>m.url);
 
       if (isEdit){
         await updateDoc(doc(db,'posts',post.id), { title, body, media });
@@ -340,16 +367,19 @@ function mountPostForm(post=null){
   };
 }
 
+// واجبات
 function mountHWForm(hw=null){
   const isEdit = !!(hw && hw.id);
   const title0 = esc(hw?.title||'');
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
-    <form id="hwForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:92%">
-      <h3>${isEdit?'تعديل واجب':'واجب جديد'}</h3>
-      <input id="hTitle" value="${title0}" placeholder="مثال: &lt;span class='badge badge-amber'&gt;H,W&lt;/span&gt;p.231" required style="display:block;width:100%;margin:6px 0;padding:8px">
-      <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
-      <button type="button" id="closeForms">إغلاق</button>
+    <form id="hwForm" style="background:#fff;padding:16px;border-radius:16px;max-width:520px;width:92%;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+      <h3 style="margin:0 0 8px 0">${isEdit?'تعديل واجب':'واجب جديد'}</h3>
+      <input id="hTitle" value="${title0}" placeholder="مثال: &lt;span class='badge badge-amber'&gt;H,W&lt;/span&gt;p.231" required style="display:block;width:100%;margin:6px 0;padding:10px;border:1px solid #e5e7eb;border-radius:12px">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button type="submit" class="save" style="background:#0f172a;color:#fff;border:none;border-radius:12px;padding:10px 14px;cursor:pointer">${isEdit?'حفظ التعديلات':'حفظ'}</button>
+        <button type="button" id="closeForms" style="background:#f1f5f9;color:#0f172a;border:none;border-radius:12px;padding:10px 14px;cursor:pointer">إغلاق</button>
+      </div>
     </form>
   </div>`;
   document.getElementById('closeForms').onclick=()=>formsRoot.innerHTML='';
@@ -371,11 +401,13 @@ function mountExamForm(ex=null){
   const title0 = esc(ex?.title||'');
   formsRoot.innerHTML=`
   <div style="position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center">
-    <form id="exForm" style="background:#fff;padding:16px;border-radius:12px;max-width:520px;width:92%">
-      <h3>${isEdit?'تعديل اختبار':'اختبار جديد'}</h3>
-      <input id="eTitle" value="${title0}" placeholder="عنوان/وصف الاختبار" required style="display:block;width:100%;margin:6px 0;padding:8px">
-      <button type="submit">${isEdit?'حفظ التعديلات':'حفظ'}</button>
-      <button type="button" id="closeForms">إغلاق</button>
+    <form id="exForm" style="background:#fff;padding:16px;border-radius:16px;max-width:520px;width:92%;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+      <h3 style="margin:0 0 8px 0">${isEdit?'تعديل اختبار':'اختبار جديد'}</h3>
+      <input id="eTitle" value="${title0}" placeholder="عنوان/وصف الاختبار" required style="display:block;width:100%;margin:6px 0;padding:10px;border:1px solid #e5e7eb;border-radius:12px">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button type="submit" class="save" style="background:#0f172a;color:#fff;border:none;border-radius:12px;padding:10px 14px;cursor:pointer">${isEdit?'حفظ التعديلات':'حفظ'}</button>
+        <button type="button" id="closeForms" style="background:#f1f5f9;color:#0f172a;border:none;border-radius:12px;padding:10px 14px;cursor:pointer">إغلاق</button>
+      </div>
     </form>
   </div>`;
   document.getElementById('closeForms').onclick=()=>formsRoot.innerHTML='';
